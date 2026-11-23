@@ -117,6 +117,27 @@ def test_probe_timeout_triggers_reset_once():
     mock_reset.assert_called_once()
 
 
+# ── auto_usb_reset off ───────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("reset_on_resume, reply", [(True, [0xb0, 0, 0]), (False, None)])
+def test_resume_never_resets_when_auto_reset_is_off(reset_on_resume, reply):
+    """Neither trigger resets when the user turned auto_usb_reset off; the
+    re-acquire through configure_virtual_sinks still runs."""
+    dc = _make_device_config(reset_on_resume=reset_on_resume, status_request=0xb0)
+    engine = _make_engine(dc)
+    engine.general_settings = MagicMock(auto_usb_reset=False)
+    engine._await_raw_response = AsyncMock(return_value=reply)
+
+    with patch('arctis_sound_manager.core.reset_via_usbfs', return_value=True) as mock_reset, \
+         patch('usb.util.dispose_resources'):
+        asyncio.run(engine.resume_from_sleep())
+
+    mock_reset.assert_not_called()
+    assert engine._resume_reset_attempted is False
+    assert engine.configure_virtual_sinks.call_count == 1
+
+
 # ── rate limiting ────────────────────────────────────────────────────────────
 
 

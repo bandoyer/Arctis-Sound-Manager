@@ -188,14 +188,6 @@ class QMainApp(QBaseDesktopApp):
         # Start on home page
         self._switch_page(PAGE_HOME)
 
-        # Check for updates (non-blocking background thread)
-        from arctis_sound_manager.update_checker import UpdateCheckWorker
-        from arctis_sound_manager.utils import project_version
-        self._update_worker = UpdateCheckWorker(project_version())
-        self._update_worker.result.connect(self._home_page.on_update_available)
-        self._update_worker.start()
-        self._device_page.sig_update_result.connect(self._home_page.on_update_available)
-
         # Check for new/updated translation files (non-blocking)
         from arctis_sound_manager.lang_updater import LangUpdateWorker
         self._lang_worker = LangUpdateWorker()

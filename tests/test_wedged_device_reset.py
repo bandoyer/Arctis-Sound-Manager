@@ -132,3 +132,34 @@ def test_a_failed_init_keeps_the_reset_spent():
     CoreEngine.init_device(engine)
 
     assert engine._wedged_reset_spent is True
+
+
+def test_a_wedged_device_is_left_alone_when_auto_reset_is_off():
+    """auto_usb_reset off: no reset, and the one-shot allowance is not spent,
+    so turning the setting back on works without restarting the daemon."""
+    engine = _make_scheduler()
+    engine.general_settings = MagicMock(auto_usb_reset=False)
+
+    with patch.object(core_mod.time, "monotonic", return_value=500.0), \
+         patch.object(core_mod.asyncio, "run_coroutine_threadsafe") as run:
+        CoreEngine._schedule_wedged_device_reset(engine, "test")
+
+    run.assert_not_called()
+    assert engine._wedged_reset_spent is False
+
+
+def test_auto_reset_on_in_settings_still_resets():
+    engine = _make_scheduler()
+    engine.general_settings = MagicMock(auto_usb_reset=True)
+
+    with patch.object(core_mod.time, "monotonic", return_value=500.0), \
+         patch.object(core_mod.asyncio, "run_coroutine_threadsafe") as run:
+        CoreEngine._schedule_wedged_device_reset(engine, "test")
+
+    run.assert_called_once()
+
+
+def test_auto_usb_reset_defaults_on():
+    from arctis_sound_manager.settings import GeneralSettings
+
+    assert GeneralSettings().auto_usb_reset is True

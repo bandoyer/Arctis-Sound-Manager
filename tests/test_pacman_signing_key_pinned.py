@@ -29,7 +29,6 @@ TRUSTING_FILES = [
     "scripts/distrobox/_common.sh",
     "scripts/distrobox/steamos.sh",
     "scripts/distrobox/bazzite.sh",
-    "src/arctis_sound_manager/update_checker.py",
     "README.md",
     ".github/workflows/pacman-repo.yaml",
 ]

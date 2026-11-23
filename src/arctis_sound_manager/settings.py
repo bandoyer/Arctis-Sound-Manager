@@ -300,6 +300,14 @@ class GeneralSettings(JsonSerializable):
     # not suit.
     usb_transport: int = 1
 
+    # Whether the daemon may reset the headset's USB connection on its own:
+    # when most device_init commands time out (a "wedged" device), when the
+    # interrupt endpoint keeps overflowing, or after resume from sleep. A
+    # reset drops the sound card for a moment, which stops playback and
+    # reboots the base station's display. Off leaves the connection alone;
+    # `asm-cli usb reset` still works by hand.
+    auto_usb_reset: bool = True
+
     # Which sink the channels come out of in generic mode. Replaces the
     # vendor-id discovery that finds an Arctis' own ALSA nodes — there is no
     # vendor id to look for, so the user names the device instead.
@@ -543,6 +551,7 @@ class GeneralSettings(JsonSerializable):
         ConfigSetting('external_output_device', SettingType.SELECT, None, options_source='external_audio_devices', options_mapping={ 'value': 'id', 'label': 'description' }),
         ConfigSetting('preferred_device', SettingType.SELECT, None, options_source='connected_arctis_devices', options_mapping={ 'value': 'id', 'label': 'name' }),
         ConfigSetting('usb_transport', SettingType.BUTTON_GROUP, 1, values_mapping={1: 'usb_transport_hidraw', 0: 'usb_transport_libusb'}),
+        ConfigSetting('auto_usb_reset', SettingType.TOGGLE, True, values={ 'on': True, 'off': False, 'off_label': 'off', 'on_label': 'on' }),
         ConfigSetting('generic_device_mode', SettingType.TOGGLE, False, values={ 'on': True, 'off': False, 'off_label': 'off', 'on_label': 'on' }),
         ConfigSetting('generic_output_device', SettingType.SELECT, None, options_source='external_audio_devices', options_mapping={ 'value': 'id', 'label': 'description' }),
         ConfigSetting('generic_input_device', SettingType.SELECT, None, options_source='pulse_audio_sources', options_mapping={ 'value': 'id', 'label': 'description' }),
