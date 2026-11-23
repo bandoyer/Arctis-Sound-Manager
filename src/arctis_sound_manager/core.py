@@ -3385,6 +3385,15 @@ class CoreEngine:
             self._schedule_wedged_device_reset(
                 f"listen overflow on interface {interface_id}")
 
+    def _auto_usb_reset_enabled(self) -> bool:
+        """The user's auto_usb_reset setting; on when it cannot be read.
+
+        Tests build engines with CoreEngine.__new__ and no general_settings,
+        so this reads defensively, like the usb_transport lookup.
+        """
+        return bool(getattr(getattr(self, 'general_settings', None),
+                            'auto_usb_reset', True))
+
     def _schedule_wedged_device_reset(self, reason: str) -> None:
         """Fire-and-forget a USB reset from sync code.
 
@@ -3397,6 +3406,12 @@ class CoreEngine:
         """
         loop = self._main_event_loop
         if loop is None or not loop.is_running():
+            return
+        if not self._auto_usb_reset_enabled():
+            self.logger.warning(
+                "%s: automatic USB reset is off (auto_usb_reset); leaving the "
+                "connection alone. Replug the headset or run `asm-cli usb reset`.",
+                reason)
             return
         if self._wedged_reset_spent:
             self.logger.warning(
@@ -5816,6 +5831,12 @@ class CoreEngine:
         probe_ok = await self._probe_device_awake()
         reset_on_resume = bool(self.device_config.reset_on_resume)
         if not (reset_on_resume or not probe_ok):
+            return
+        if not self._auto_usb_reset_enabled():
+            self.logger.info(
+                "resume_from_sleep: automatic USB reset is off (auto_usb_reset); "
+                "not resetting (%s)",
+                "reset_on_resume" if reset_on_resume else "status probe timeout")
             return
 
         if self._resume_reset_attempted:
