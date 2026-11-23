@@ -513,14 +513,7 @@ HELP_CONTENT: dict[str, dict] = {
                     "presets you already have stay.\n\n"
                     "── Several headsets ──\n"
                     "When more than one Arctis is plugged in, choose the one ASM drives with "
-                    "\"Preferred Arctis Device\" on the Headset page.\n\n"
-                    "── Check for updates ──\n"
-                    "The \"Check for updates\" button at the bottom of the page forces an immediate "
-                    "check against the latest GitHub release, bypassing the normal 24-hour cache. "
-                    "If a newer version is available, click the result label to open the update "
-                    "dialog: for package manager installs (pacman, dnf, apt) it shows the command "
-                    "and can open a terminal automatically; for pipx/pip installs it downloads and "
-                    "installs the wheel in-app."
+                    "\"Preferred Arctis Device\" on the Headset page."
                 ),
             },
             {

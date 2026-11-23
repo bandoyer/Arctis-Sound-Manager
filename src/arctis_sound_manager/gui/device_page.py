@@ -10,8 +10,6 @@ import shutil
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtGui import QDesktopServices
-from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -50,7 +48,6 @@ from arctis_sound_manager.gui.theme import (
     BG_MAIN,
     BORDER,
     TEXT_PRIMARY,
-    TEXT_SECONDARY,
     THEMES,
     all_theme_labels, get_theme, get_theme_label, is_builtin,
     reload_user_themes,
@@ -183,7 +180,6 @@ class DevicePage(QWidget):
     sig_theme_changed = Signal(str)
     sig_theme_create = Signal()
     sig_theme_edit = Signal(str)   # theme_id
-    sig_update_result = Signal(str, str, str)  # re-emits (version, url, wheel_url) from manual re-check
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
@@ -221,19 +217,6 @@ class DevicePage(QWidget):
 
         # ── General ───────────────────────────────────────────────────────────
         general = self._add_card(content_layout, "settings_group_general")
-
-        self._check_update_btn = _styled_button(I18n.translate("ui", "check_for_updates"))
-        self._check_update_btn.setFixedHeight(30)
-        self._check_update_btn.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
-        self._check_update_btn.clicked.connect(self._on_check_update)
-
-        self._update_status_lbl = QLabel("")
-        self._update_status_lbl.setStyleSheet(
-            f"color: {TEXT_SECONDARY}; font-size: 10pt; background: transparent;"
-        )
-        self._update_status_lbl.setWordWrap(True)
-
-        self._update_url: str = ""
 
         self._lang_combo = NoWheelComboBox()
         self._lang_combo.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -296,10 +279,6 @@ class DevicePage(QWidget):
         # GeneralSettings shows up even before it is given a group.
         self._general_widget = self._add_settings_group(
             general, None, exclude=_INTERFACE_KEYS + _AUDIO_KEYS + _MICRO_KEYS + _GENERIC_KEYS)
-
-        update_row = self._add_row(general, I18n.translate("ui", "check_for_updates"),
-                                   self._check_update_btn)
-        update_row.layout().insertWidget(2, self._update_status_lbl, 1)
 
         # ── Interface & tray: theme, then the tray settings ───────────────────
         interface = self._add_card(content_layout, "settings_group_interface")
@@ -437,26 +416,6 @@ class DevicePage(QWidget):
                 }}
             """)
 
-        # Update status label
-        if hasattr(self, "_update_status_lbl"):
-            self._update_status_lbl.setStyleSheet(
-                f"color: {_theme.c('TEXT_SECONDARY')}; font-size: 10pt; background: transparent;"
-            )
-
-        # Check-for-updates button — restyle via factory function
-        if hasattr(self, "_check_update_btn"):
-            self._check_update_btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: {_theme.c('BG_BUTTON')};
-                    color: {_theme.c('TEXT_PRIMARY')};
-                    border: 1px solid {_theme.c('BG_BUTTON_HOVER')};
-                    border-radius: 6px;
-                    font-size: 10pt;
-                    padding: 0 12px;
-                }}
-                QPushButton:hover {{ background-color: {_theme.c('BG_BUTTON_HOVER')}; }}
-            """)
-
         # Theme combo and buttons state are set via refresh_theme_combo / _update_theme_buttons_state.
 
     # ── Theme selector ────────────────────────────────────────────────────────
@@ -587,171 +546,3 @@ class DevicePage(QWidget):
         msg.setText(I18n.translate("ui", "language_changed"))
         msg.setIcon(QMessageBox.Icon.Information)
         msg.exec()
-
-    def _on_check_update(self) -> None:
-        from arctis_sound_manager.update_checker import UpdateCheckWorker
-        from arctis_sound_manager.utils import project_version
-
-        self._check_update_btn.setEnabled(False)
-        self._check_update_btn.setText(I18n.translate("ui", "checking_updates"))
-        self._update_status_lbl.setText("")
-        self._update_url = ""
-
-        self._update_worker = UpdateCheckWorker(project_version(), force=True)
-        self._update_worker.result.connect(self._on_check_update_result)
-        self._update_worker.start()
-
-    @Slot(str, str, str)
-    def _on_check_update_result(self, version: str, url: str, wheel_url: str) -> None:
-        self._check_update_btn.setEnabled(True)
-        self._check_update_btn.setText(I18n.translate("ui", "check_for_updates"))
-
-        if version:
-            self._update_url = url
-            self._update_wheel_url = wheel_url
-            self._update_version = version
-            self._update_status_lbl.setStyleSheet(
-                f"color: {ACCENT}; font-size: 10pt; background: transparent; text-decoration: underline;"
-            )
-            self._update_status_lbl.setText(f"v{version} available — click to install")
-            self._update_status_lbl.mousePressEvent = lambda _: self._do_install_update()
-            self._update_status_lbl.setCursor(Qt.CursorShape.PointingHandCursor)
-        else:
-            self._update_status_lbl.setStyleSheet(
-                f"color: {TEXT_SECONDARY}; font-size: 10pt; background: transparent;"
-            )
-            self._update_status_lbl.setText(I18n.translate("ui", "up_to_date"))
-
-        self.sig_update_result.emit(version, url, wheel_url)
-
-    def _do_install_update(self) -> None:
-        from arctis_sound_manager.update_checker import (
-            InstallMethod, UpdateInstallWorker, build_terminal_cmd,
-            detect_all_install_methods, package_manager_command,
-        )
-        from PySide6.QtCore import QTimer
-        from PySide6.QtWidgets import (
-            QApplication, QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout,
-        )
-        from arctis_sound_manager.gui.theme import BG_BUTTON_HOVER, BG_CARD, BG_MAIN, BORDER
-
-        all_methods = detect_all_install_methods()
-        if len(all_methods) > 1:
-            from arctis_sound_manager.gui.install_dialogs import show_multi_install_warning
-            show_multi_install_warning(self, all_methods)
-            return
-
-        method = all_methods[0] if all_methods else InstallMethod.PIP
-        cmd = package_manager_command(method)
-
-        if cmd:
-            terminal_args = build_terminal_cmd(cmd)
-            dlg = QDialog(self)
-            dlg.setWindowTitle("Update available")
-            dlg.setMinimumWidth(480)
-            dlg.setStyleSheet(f"background-color: {BG_MAIN}; color: {TEXT_PRIMARY};")
-            layout = QVBoxLayout(dlg)
-            layout.setContentsMargins(24, 20, 24, 20)
-            layout.setSpacing(12)
-
-            msg = ("ASM was installed via your package manager.\n"
-                   "Click \"Update now\" to open a terminal and run the update:"
-                   if terminal_args else
-                   "ASM was installed via your package manager.\n"
-                   "Run this command in a terminal to update:")
-            lbl = QLabel(msg)
-            lbl.setStyleSheet(f"color: {TEXT_SECONDARY}; font-size: 10pt; background: transparent;")
-            lbl.setWordWrap(True)
-            layout.addWidget(lbl)
-
-            cmd_lbl = QLabel(cmd)
-            cmd_lbl.setStyleSheet(
-                f"background-color: {BG_CARD}; color: {TEXT_PRIMARY}; font-family: monospace; "
-                f"font-size: 10pt; padding: 10px; border-radius: 6px; border: 1px solid {BORDER};"
-            )
-            cmd_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-            layout.addWidget(cmd_lbl)
-
-            btn_row = QHBoxLayout()
-            btn_row.addStretch()
-            if terminal_args:
-                open_btn = QPushButton("Update now")
-                open_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-                open_btn.setStyleSheet(
-                    f"QPushButton {{ background-color: {ACCENT}; color: #fff; border: none; "
-                    f"border-radius: 6px; padding: 8px 18px; font-size: 10pt; }}"
-                    f"QPushButton:hover {{ background-color: {BG_BUTTON_HOVER}; }}"
-                )
-                def _open_terminal():
-                    import subprocess as _sp
-                    _sp.Popen(terminal_args)
-                    dlg.accept()
-                open_btn.clicked.connect(_open_terminal)
-                btn_row.addWidget(open_btn)
-
-            copy_btn = QPushButton("Copy command")
-            copy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            copy_btn.setStyleSheet(
-                f"QPushButton {{ background-color: {'transparent' if terminal_args else ACCENT}; "
-                f"color: {TEXT_PRIMARY if terminal_args else '#fff'}; "
-                f"border: {'1px solid ' + BORDER if terminal_args else 'none'}; "
-                f"border-radius: 6px; padding: 8px 18px; font-size: 10pt; }}"
-                f"QPushButton:hover {{ background-color: {BG_BUTTON_HOVER}; color: {TEXT_PRIMARY}; }}"
-            )
-            def _copy():
-                from PySide6.QtGui import QClipboard
-                QApplication.clipboard().setText(cmd, QClipboard.Mode.Clipboard)
-                copy_btn.setText("Copied!")
-                copy_btn.setEnabled(False)
-                # context=copy_btn: cancels the timer if the dialog is closed
-                # before it fires, avoiding a shiboken use-after-free (issue #100).
-                QTimer.singleShot(2000, copy_btn, lambda: (copy_btn.setText("Copy command"), copy_btn.setEnabled(True)))
-            copy_btn.clicked.connect(_copy)
-            btn_row.addWidget(copy_btn)
-
-            close_btn = QPushButton("Close")
-            close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            close_btn.setStyleSheet(
-                f"QPushButton {{ background-color: {BG_BUTTON}; color: {TEXT_PRIMARY}; border: none; "
-                f"border-radius: 6px; padding: 8px 18px; font-size: 10pt; }}"
-                f"QPushButton:hover {{ background-color: {BG_BUTTON_HOVER}; }}"
-            )
-            close_btn.clicked.connect(dlg.accept)
-            btn_row.addWidget(close_btn)
-            layout.addLayout(btn_row)
-            dlg.exec()
-            return
-
-        # pipx / pip — in-app wheel install
-        if not self._update_wheel_url:
-            QDesktopServices.openUrl(QUrl(self._update_url))
-            return
-
-        self._update_status_lbl.setText("Installing…")
-        self._update_status_lbl.setStyleSheet(
-            f"color: {TEXT_SECONDARY}; font-size: 10pt; background: transparent;"
-        )
-        self._update_status_lbl.setCursor(Qt.CursorShape.ArrowCursor)
-        self._update_status_lbl.mousePressEvent = None
-
-        self._install_worker = UpdateInstallWorker(self._update_wheel_url)
-        self._install_worker.finished.connect(self._on_install_finished)
-        self._install_worker.start()
-
-    @Slot(bool, str)
-    def _on_install_finished(self, success: bool, error_msg: str) -> None:
-        import os, sys
-        if success:
-            self._update_status_lbl.setText("Update installed — running setup…")
-            from pathlib import Path
-            (Path.home() / ".config" / "arctis_manager" / ".setup_done").unlink(missing_ok=True)
-            from arctis_sound_manager.gui.first_run_dialog import FirstRunDialog
-            FirstRunDialog(self).exec()
-            from arctis_sound_manager import service_control as sc
-            sc.restart("arctis-manager")
-            os.execv(sys.executable, [sys.executable, "-m", "arctis_sound_manager.scripts.gui"])
-        else:
-            self._update_status_lbl.setStyleSheet(
-                "color: #FF5555; font-size: 10pt; background: transparent;"
-            )
-            self._update_status_lbl.setText(f"Update failed: {error_msg}")

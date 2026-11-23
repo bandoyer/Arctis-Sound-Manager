@@ -187,7 +187,6 @@ The SteelSeries GG and Sonar alternative for Linux: manage your **SteelSeries Ar
 
 - **Runs without a SteelSeries headset** — the channels, the Sonar EQ, spatial audio, the router and Clips work on any output device; only battery, ANC, sidetone, ChatMix and the OLED need an Arctis. Off by default, and a connected Arctis always wins
 - **Self-healing deps** — at startup ASM checks every system component (LADSPA plugins, HRIR, PipeWire, wpctl, udev rules…); a one-click dialog installs anything missing with a single `pkexec` prompt
-- **Check for updates** — in-app button forces an immediate GitHub check; installs via terminal (pacman / dnf / apt) or in-app wheel (pipx)
 - **One-click bug reports** — auto-uploads a full diagnostic (including the kernel's USB and sound messages from this boot and the previous one) as a GitHub gist and opens a pre-filled issue
 - **Built-in diagnostics** — `asm-daemon --verify-setup`, `asm-cli diagnose -o file.txt`, and `asm-cli tools probe`, which asks the headset for its state with read-only queries and saves the raw replies
 - **Status for scripts and bars** — `asm-cli status --json` gives battery, power, mic and channel levels to Waybar, Polybar or any script ([details](#headset-status-in-scripts-and-status-bars))
@@ -1158,7 +1157,7 @@ src/arctis_sound_manager/
 │   ├── sonar_page.py              # Sonar EQ — presets, Spatial Audio, macro sliders
 │   ├── equalizer_page.py          # Custom EQ mode toggle + 10-band sliders
 │   ├── headset_page.py            # Device info and live status (battery, mic, ANC)
-│   ├── device_page.py             # App settings (language, startup, update check)
+│   ├── device_page.py             # App settings (language, startup)
 │   ├── dac_page.py                # GameDAC OLED control (clock, weather, brightness)
 │   ├── help_page.py               # Built-in user manual (EN / FR / ES)
 │   ├── theme.py                   # Theme engine — built-in + user themes, QSS
@@ -1211,7 +1210,6 @@ src/arctis_sound_manager/
 ├── system_deps_checker.py         # Startup self-healing dependency checker
 ├── udev_rules.py                  # udev rule generation (SteelSeries USB rules)
 ├── udev_checker.py                # udev rule presence / content verifier
-├── update_checker.py              # GitHub release update checker
 ├── lang_updater.py                # Online translation updater (GitHub → ~/.config)
 ├── telemetry.py                   # Anonymous opt-in usage telemetry
 ├── autostart.py                   # Autostart management (systemd / XDG / DE-specific)
